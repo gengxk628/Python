@@ -8,7 +8,7 @@
 5. The box in the game can be blown up
 6. The tree and the house in the game cannot be blown up
 7. The role will speed up after blowing up the box
-8. The game will end on condition that there is only on role surviving in game
+8. The game will end on condition that there is only one role surviving in game
 9. Click the right button, press the escape key or press the O key to close the game 
 
 * * *
