@@ -33,7 +33,7 @@ class Coordinate:  #坐标类，存储游戏中其他类的坐标，并判断相
         else:
             return False
 
-class MyImage():  #定义一个图像基类
+class MyImage:  #定义一个图像基类
     def __init__(self):
         pass
 
@@ -54,6 +54,7 @@ class StillImage(MyImage,Coordinate):  #游戏中的静态图片
         
     def __setStillImageConstant(self):  #设置要用到的成员变量
         self.image = None
+        self.on = False  #为了兼容炸弹
         pass
         
     def __accessImage(self, fileName):  #读取图片
@@ -105,7 +106,8 @@ class Role(Animation):  #继承自Animation类
         self.__setRoleConstant()
 
     def __setRoleConstant(self):
-        self.v = 0.08  #角色移动的速度
+        self.v = 0.1  #角色移动的速度
+        self.life = True  #角色是否活着
         pass
 
     def forward(self):  #根据当前条件前进
@@ -132,21 +134,46 @@ class Role(Animation):  #继承自Animation类
                 self.x-=self.v
         pass
 
-class Bomb(StillImage):
-    def __init__(self, fileName, x, y, width, height):  #图片名
-        StillImage.__init__(self, fileName, x, y, width, height)
+class Bomb(Animation):
+    def __init__(self, x, y, width, height, master):
+        fileName = ["img/bomb0.gif","img/bomb1.gif","img/wave0.gif","img/wave1.gif","img/wave2.gif"]
+        Animation.__init__(self, fileName, x, y, width, height)
+        self.__setBombConstant()
+        self.master=master  #设置主人
+        pass
 
     def __setBombConstant(self):
-        self.wholeSpan = 60  #控制炸弹延迟的帧数
-        self.currentSpan = 0
-        self.on = False  #炸弹是否爆炸
+        self.bombSpan = 60  #控制炸弹延迟的帧数
+        self.waveSpan = 15 #控制波浪的帧数
+        self.currentSpan = 0  #目前的帧数
+        self.master = 0  #放此炸弹的role的编号
+        self.on =False  #播放波浪动画
+        self.isWave = False  #炸弹是否爆炸
+        self.isEnd = False  #是否结束
 
-    def next(self):
+    def getImage(self):  #获取当前应该读取的图片
         self.currentSpan +=1
-        if(self.currentSpan>self.wholeSpan):
-            self.on = True
-            
 
+        if(self.currentSpan>self.bombSpan + self.waveSpan):
+            self.isEnd =True  #炸弹结束
+
+        elif(self.currentSpan>self.bombSpan):
+            self.isWave = True  #炸弹已经爆炸，下面应该播放波浪的动画
+            self.on =True
+            if(self.currentSpan-self.bombSpan < self.waveSpan*0.2):  #顺序播放三张图片
+                return self.image[2]
+            elif(self.currentSpan-self.bombSpan < self.waveSpan*0.4):
+                return self.image[3]
+            elif(self.currentSpan-self.bombSpan < self.waveSpan*0.6):
+                return self.image[4]
+            elif(self.currentSpan-self.bombSpan < self.waveSpan*0.8):
+                return self.image[3]
+            else:
+                return self.image[2]
+
+        else:  #炸弹还没有爆炸，应该播放炸弹的图片
+            return self.image[math.floor(self.currentSpan/2)%2]  #轮流播放
+          
 class Map:
     def __init__(self, fileName):
         self.__setMapConstant()
@@ -161,13 +188,13 @@ class Map:
 
         #游戏每个格子代表静态物体对应的数字
         self.game_yellowground = 0
-        self.game_greenground = 1
+        self.game_bomb = 1
         self.game_yellowbox = 2
         self.game_redbox = 3
         self.game_tree = 4
         self.game_house = 5
         #沙地（用0表示，角色可以在上面走）
-        #草地（用1表示，角色可以在上面走）
+        #炸弹（用1表示，角色可以在上面走）
         #黄色的箱子（用2表示，角色可以用炸弹炸掉）
         #绿色的积木（用3表示，角色可以用炸弹炸掉）
         #树（用4表示，不能被炸掉）
@@ -179,7 +206,7 @@ class Map:
         for y in range(0,10):
             for x in range(0,16):
                 self.numMap[x][y] = int(file.read(1))  #读取每一个格子的信息
-                if(self.numMap[x][y] == 0 or self.numMap[x][y] == 1):  #num==0 or ==1 说明此处为背景
+                if(self.numMap[x][y] == 0 or self.numMap[x][y] == 1):  #num==0 or ==1 说明此处为背景、炸弹
                     self.map[x][y] = None
                 elif(self.numMap[x][y] == 2):
                     self.map[x][y] = StillImage("img/yellowbox.gif",x,y,1,1)
@@ -192,6 +219,26 @@ class Map:
                 file.read(1)
         file.close()
 
+    def setBomb(self,x,y,master):  #在（x,y）处安放炸弹
+        if(self.numMap[x][y]==0):  #是背景，可以放炸弹
+            self.numMap[x][y]=1
+            self.map[x][y]=Bomb(x,y,1,1,master)
+        pass
+
+    def willBomb(self, other):#判断另一个坐标是否会与当前地图中的物体炸弹（为AI模块准备）
+
+        x=math.floor(other.x)
+        y=math.floor(other.y)
+        if(x<0 or y<0 or x>=15 or y>=9):  #越界(注意四个等号什么时候可以取得，什么时候不能取得，斟酌了好一会)
+            return True
+        #self.numMap[x][y]==1代表相撞了炸弹
+        if(self.numMap[x][y]==1 and self.map[x][y].collide(other) or \
+           self.numMap[x+1][y]==1 and self.map[x+1][y].collide(other) or \
+           self.numMap[x][y+1]==1 and self.map[x][y+1].collide(other) or \
+           self.numMap[x+1][y+1]==1 and self.map[x+1][y+1].collide(other)):  #判断是否相撞
+            return True
+        return False
+  
     def willCollide(self, other):  #判断另一个坐标是否会与当前地图中的物体相撞，或者越界（核心算法之一）
 
         x=math.floor(other.x)
@@ -241,6 +288,7 @@ class Access:  #读取数据
         self.endphoto2 = tkinter.PhotoImage(file="img/endphoto2.gif")
         self.endphoto3 = tkinter.PhotoImage(file="img/endphoto3.gif")
         self.endphoto4 = tkinter.PhotoImage(file="img/endphoto4.gif")
+        self.endphoto = tkinter.PhotoImage(file="img/endphoto.gif")
 
     def __accessRoles(self):  #读取人物的信息
 
@@ -252,15 +300,17 @@ class Access:  #读取数据
                 else:
                     name = "img/role" + str(i) + "0" + str(j) + ".gif"
                 namelist[i].append(name)
-        self.role.append(Role(namelist[0],15,0,1,1.5))
-        self.role.append(Role(namelist[0],0,0,1,1.5))
-        self.role.append(Role(namelist[0],0,9,1,1.5))
-        self.role.append(Role(namelist[0],15,9,1,1.5))
+
+        self.role.append(Role(namelist[0],14.9,0.1,1,1.5))  #之所以不设置为整数值是为了防止卡在边上
+        self.role.append(Role(namelist[1],0.1,0.1,1,1.5))
+        self.role.append(Role(namelist[2],0.1,8.9,1,1.5))
+        self.role.append(Role(namelist[3],14.9,8.9,1,1.5))
 
 class Game(Map, Access):  #游戏引擎，继承自Map，Access
 
     def __init__(self):
         self.__setGameConstant()
+        self.__setScreen()  #注意此处方法调用的顺序
         pass
         
     def __setGameConstant(self):  #设置游戏中的一些常量
@@ -276,6 +326,7 @@ class Game(Map, Access):  #游戏引擎，继承自Map，Access
         self.game_end2 = 5   #游戏结束，玩家2胜利
         self.game_end3 = 6   #游戏结束，玩家3胜利
         self.game_end4 = 7   #游戏结束，玩家4胜利
+        self.game_end = 8   #游戏结束，无人胜利
 
         #显示的宽高
         self.width = 1280
@@ -284,15 +335,22 @@ class Game(Map, Access):  #游戏引擎，继承自Map，Access
         #游戏帧率
         self.fps =30
 
+        #__mainloop()总循环次数
+        self.sum = 0
+        self.span = 0
+
         #游戏主循环开关
         self.on = False
 
     def __setScreen(self):  #设置显示模式，以及监听鼠标、键盘按键
 
         self.popo = tkinter.Tk()
-        self.popo.geometry("%dx%d" % (self.width, self.height))  # 设置屏幕的大小
+        screenwidth = self.popo.winfo_screenwidth()
+        screenheight = self.popo.winfo_screenheight()
+        self.popo.geometry("%dx%d+%d+%d" % (self.width, self.height, (screenwidth - self.width)/2, (screenheight - self.height)/2))  # 设置屏幕的大小
+        self.popo.focus_set()
         #self.popo.attributes("-topmost", True) # 显示在最前方
-                                                                       #self.popo.overrideredirect(1) # 隐藏标题栏
+        self.popo.overrideredirect(1) # 隐藏标题栏
 
         self.canvas = tkinter.Canvas(self.popo, width= self.width, height= self.height)
         self.canvas.pack()
@@ -311,9 +369,16 @@ class Game(Map, Access):  #游戏引擎，继承自Map，Access
 
         if(self.state == self.game_init):
 
-            self.__setScreen()  #注意此处方法调用的顺序
-            Map.__init__(self, "data/map.txt")  #调用父类的构造方法
+            file=open("data/count.txt")
+            count = int(file.readline())  #读入地图的张数
+            index = math.floor(time.clock()*1000) % count  #随机取其中一张地图的编号
+            filename = "data/map" + str(index) + ".txt"
+            Map.__init__(self, filename)  #调用父类的构造方法
+
             Access.__init__(self)
+
+            self.role[2].on = True  #电脑自动开始跑人物
+            self.role[3].on = True
 
             #初始化之后将状态转化到start
             self.state = self.game_start
@@ -326,13 +391,33 @@ class Game(Map, Access):  #游戏引擎，继承自Map，Access
 
         elif(self.state == self.game_run):
 
+            self.__AI()  #电脑人物自动出击
+            self.__moveRoles()
+
             self.canvas.delete("all")  #很重要，防止canvas重新画出以前的图片，这一条语句调试了很长时间
 
-            self.__moveRoles()
             self.__loadStillImage()
             self.__loadRoles()
             
             self.canvas.update()
+
+            #判断多少角色死了，该进入那个状态
+            surrive=0
+            for i in range(0,4):
+                if(self.role[i].life):
+                    surrive+=1
+            if(surrive==1):  #只剩一个人活着
+                if(self.role[0].life):
+                    self.state=self.game_end1
+                elif(self.role[1].life):
+                    self.state=self.game_end2
+                elif(self.role[2].life):
+                    self.state=self.game_end3
+                elif(self.role[3].life):
+                    self.state=self.game_end4
+            elif(surrive==0):  #同时死完
+                self.state=self.game_end
+            pass
 
         elif(self.state == self.game_pause):
 
@@ -364,13 +449,20 @@ class Game(Map, Access):  #游戏引擎，继承自Map，Access
             self.canvas.create_image(640, 400, image = self.endphoto4)
             self.canvas.update()
 
+        elif(self.state == self.game_end):
+            
+            self.canvas.delete("all")
+            self.canvas.create_image(640, 400, image = self.endphoto)
+            self.canvas.update()
+
         pass
 
     def __moveRoles(self):  #移动角色（并检测碰撞）
-        for i in range(0,4):
-            self.role[i].forward()
-            if(self.willCollide(self.role[i])):
-                self.role[i].backward()
+        for i in range(0,2):
+            if(self.role[i].life):  #如果活着
+                self.role[i].forward()
+                if(self.willCollide(self.role[i])):
+                    self.role[i].backward()
         pass
 
     def __loadStillImage(self):  #画出背景和所有静态图片
@@ -378,18 +470,55 @@ class Game(Map, Access):  #游戏引擎，继承自Map，Access
         #画每个格子里的物件
         for i in range(0,16):
             for j in range(0,10):
-                if(self.map[i][j] != None):  #map[][]为StillImage对象
+                if(self.numMap[i][j] != 0):  #map[][]为StillImage对象
                     self.__loadImage(self.map[i][j].getImage(), i,j, self.map[i][j].width, self.map[i][j].height)
+                    if(self.map[i][j].on):  #如果是爆炸的炸弹
+                        self.__clean(i,j)
+                        if(self.map[i][j].isEnd):  #已经结束爆炸
+                            self.map[i][j]= None  #清除该炸弹
+                            self.numMap[i][j]=0
                 pass
 
     def __loadRoles(self):  #画人物
         for i in range(0,4):
-            self.__loadImage(self.role[i].getImage(), self.role[i].x, self.role[i].y, 1, 1.5)
+            if(self.role[i].life):  #如果活着
+                self.__loadImage(self.role[i].getImage(), self.role[i].x, self.role[i].y, 1, 1.5)
+            pass
 
     def __loadImage(self, photo, x, y, width=1, height=1):
         #加载width*height的静态图片
         #此处的（x,y）表示相对位置（0,0）-（16,10）
         self.canvas.create_image((x + 1 - width / 2) * 80, (y + 1 - height / 2) * 80, image=photo)
+
+    def __clean(self,i,j):  #炸弹在（i,j）爆炸
+        
+        #清除炸弹周围可清除的东西（炸弹除外）
+        if(i-1>=0 and self.numMap[i-1][j]<=3 and self.numMap[i-1][j]>1):
+            self.numMap[i-1][j]=0
+            self.map[i-1][j]=None
+            self.role[self.map[i][j].master].v+=0.002  #炸掉物体后自身速度增加
+        if(j-1>=0 and self.numMap[i][j-1]<=3 and self.numMap[i][j-1]>1):
+            self.numMap[i][j-1]=0
+            self.map[i][j-1]=None
+            self.role[self.map[i][j].master].v+=0.002
+        if(i+1<=15 and self.numMap[i+1][j]<=3 and self.numMap[i+1][j]>1):
+            self.numMap[i+1][j]=0
+            self.map[i+1][j]=None
+            self.role[self.map[i][j].master].v+=0.002
+        if(j+1<=9 and self.numMap[i][j+1]<=3 and self.numMap[i][j+1]>1):
+            self.numMap[i][j+1]=0
+            self.map[i][j+1]=None
+            self.role[self.map[i][j].master].v+=0.002
+        pass
+        #清除炸弹周围的人
+        for k in range(0,4):  #刚才循环变量用i了，调试半天…………
+            if(k!=self.map[i][j].master):  #如果不是自己的炸弹
+                if(self.role[k].life):  #如果活着
+                    position=self.role[k].mainIn()
+                    if(position==(i,j) or position==(i-1,j) or position==(i,j-1) or \
+                       position==(i+1,j) or position==(i,j+1)):  #如果该角色在周围
+                        self.role[k].life = False  #role[i]死亡
+            pass
 
     def __keypress(self, event):  #绑定事件
         if(event.keysym == "Return"):  #按下回车键
@@ -418,6 +547,15 @@ class Game(Map, Access):  #游戏引擎，继承自Map，Access
         elif(event.keysym == "d"):
             self.role[1].direction = "right"
             self.role[1].on = True
+        elif(event.keysym == "Control_R"):  #放炸弹
+            if(self.role[0].life):  #如果角色1活着
+                self.setBomb(self.role[0].mainIn()[0],self.role[0].mainIn()[1],0)
+        elif(event.keysym == "Control_L"):
+            if(self.role[1].life):  #如果角色2活着
+                self.setBomb(self.role[1].mainIn()[0],self.role[1].mainIn()[1],1)
+        elif(event.keysym == "Escape" or event.keysym == "o"):
+            self.on = False
+            exit()
         pass
 
     def __keyrelease(self, event):  #按键释放
@@ -445,6 +583,7 @@ class Game(Map, Access):  #游戏引擎，继承自Map，Access
 
     def __rightclick(self, event):
         self.on = False
+        exit()
         pass
 
     def __continue(self):  #根据游戏状态进行跳转
@@ -454,14 +593,80 @@ class Game(Map, Access):  #游戏引擎，继承自Map，Access
             self.state = self.game_pause
         elif(self.state == self.game_pause):
             self.state = self.game_run
+        else:
+            self.__setGameConstant()
+            self.on = True
+            self.state=self.game_init
         pass
+
+    def __AI(self):  #3、4号玩家自动寻路、放炸弹
+        for i in range(2,4):
+            if(self.role[i].life):  #如果角色活着
+                if(math.floor(time.clock()*1000)%15 == 1):  #1/15的可能性转头
+                    self.role[i].direction = self.__outDirection(self.role[i].direction)  #然后再随机改变自己的方向（侧向）
+                self.role[i].forward()  #先依照当前的方向向前走一步
+                if(self.willCollide(self.role[i])):  #如果会碰撞到物体
+                        self.role[i].backward()  #就退回来
+                        if(math.floor(time.clock()*1000)%16 == 2):  #1/16的可能性放炸弹
+                            self.setBomb(self.role[i].mainIn()[0],self.role[i].mainIn()[1],i)  #然后放炸弹
+                        self.role[i].direction = self.__outDirection(self.role[i].direction)  #然后再随机改变自己的方向（侧向）
+        pass
+
+    def __outDirection(self, direction):  #如果方向是上下的话，就返回左或右
+        if(direction == "up" or direction == "down"):
+            if(math.floor(time.clock()*1000)%2 == 1):
+                return "left"
+            else:
+                return "right"
+        elif(direction == "left" or direction == "right"):
+            if(math.floor(time.clock()*1000)%2 == 1):
+                return "up"
+            else:
+                return "down"
+        pass
+
+    def __otherDirection(self, direction):  #返回一个随机方向（为AI模块准备）
+        #在此规定上下左右分别为0、1、2、3
+        if(direction == "up"):
+            direction = 0  #转化为数字
+        elif(direction == "down"):
+            direction = 1
+        elif(direction == "left"):
+            direction = 2
+        elif(direction == "right"):
+            direction = 3
+
+        rnd = math.floor(time.clock()*1000)%4  #生成一个随机数
+        if(rnd != direction):
+            direction = rnd
+        elif(rnd == direction):  #巧了，正好是他本身
+            direction = rnd + 1  #那就再加一个
+            if(direction > 3):   #又巧了，越界了，哭笑
+                direction = 0
+
+        if(direction == 0):
+            direction = "up"  #转化为方向
+        elif(direction == 1):
+            direction = "down"
+        elif(direction == 2):
+            direction = "left"
+        elif(direction == 3):
+            direction = "right"
+
+        return direction
 
     def start(self):  #开始游戏主循环
         self.on = True
         while self.on:
+            self.sum+=1
+            if(self.sum%30==0):
+                print("此时的平均渲染时间为%.2f毫秒，要求最长渲染时间为%.2f毫秒" %(self.span*1000/self.fps,1000/self.fps))
+                self.span=0
+
             start = time.clock()
             self.__mainloop()
             span = time.clock() - start  #计算本次循环的周期
+            self.span+=span
             if(span < 1 / self.fps):
                 time.sleep(1 / self.fps - span)  #尽量保证每次渲染间隔为常数，1/fps
             pass
