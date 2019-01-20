@@ -1,6 +1,6 @@
-### name of the game：popo
+## name of the game：popo
 
-#### gameplay：
+### gameplay：
 1. Press the enter key of click the left button to start the game
 2. You can move the left up role by pressing up, down, left or right key, and set a bomb by pressing Ctrl_right key
 3. You can move the right up role by pressing w, a, s or d key, and set a bomb by pressing Ctrl_left key
@@ -13,18 +13,18 @@
 
 * * *
 
-* 游戏语言by Python3.7
-* 游戏代码及逻辑by Geng Xinkuang
-* 游戏素材及美工by Hu Ri
-* 部分图片及地图数据by Yue Pengshuo
-* 游戏硬件配置及运行环境by Wu Haolong
+* the coding language of the game is Python3.7
+* the codes and is programed by Geng Xinkuang
+* the material and the game art is designed by Hu Rui
+* some of the images and the map data is created by Yue Pengshuo
+* the hardware and running environment is by Wu Haolong ( in the raspberry, unluuckily now the game seems to be a PC one )
 
 * * *
 * * *
 
-### 游戏名称：popo
+## 游戏名称：popo
 
-#### 游戏玩法：
+### 游戏玩法：
 1. 进入游戏后按下回车键或单击鼠标左键开始游戏
 2. 对于右上角的人物一，上下左右键移动，Ctrl右放炸弹
 3. 对于左上角的人物二，w s a d 键移动，Ctrl左放炸弹
@@ -41,4 +41,4 @@
 * 游戏代码及逻辑by Geng Xinkuang
 * 游戏素材及美工by Hu Ri
 * 部分图片及地图数据by Yue Pengshuo
-* 游戏硬件配置及运行环境by Wu Haolong
+* 游戏硬件配置及运行环境by Wu Haolong（原本是在树莓派里的，不过现在好像要运行在PC里了）
