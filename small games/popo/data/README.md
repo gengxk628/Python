@@ -7,7 +7,7 @@
 * the green box (use 3 to represent it, and the role can use the bomb to blow it up)
 * the tree (use 4 to represent it, and the role cannot use the bomb to blow it up)
 * the green box (use 3 to represent it, and the role cannot use the bomb to blow it up)
-* * *
+_ _ _
 * tip: owing to some reason, the figure 1 cannot be a figure in the map.
 
 * * *
